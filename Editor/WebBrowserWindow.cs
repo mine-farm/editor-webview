@@ -46,7 +46,7 @@ namespace MF.WebBrowser.Editor
         private void OnEnable()
         {
             titleContent = new GUIContent("Web Browser");
-            minSize = new Vector2(480f, 320f);
+            minSize = new Vector2(560f, 360f);
             AssemblyReloadEvents.beforeAssemblyReload += DisposeBrowser;
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
         }
@@ -71,10 +71,26 @@ namespace MF.WebBrowser.Editor
             var toolbar = new VisualElement();
             toolbar.AddToClassList("web-browser-toolbar");
 
-            toolbar.Add(CreateButton("◀", "Back", () => browser?.GoBack()));
-            toolbar.Add(CreateButton("▶", "Forward", () => browser?.GoForward()));
-            toolbar.Add(CreateButton("↻", "Refresh", () => browser?.Refresh()));
-            toolbar.Add(CreateButton("⌂", "Home", () => Navigate(DefaultUrl)));
+            var navigation = new VisualElement();
+            navigation.AddToClassList("web-browser-navigation");
+            navigation.Add(CreateButton("←", "Back", () => browser?.GoBack()));
+            navigation.Add(CreateButton("→", "Forward", () => browser?.GoForward()));
+            navigation.Add(CreateButton("↻", "Refresh", () => browser?.Refresh()));
+            toolbar.Add(navigation);
+
+            var omnibox = new VisualElement
+            {
+                name = "omnibox"
+            };
+            omnibox.AddToClassList("web-browser-omnibox");
+
+            var siteBadge = new Label("◉")
+            {
+                name = "siteBadge",
+                tooltip = "Site information"
+            };
+            siteBadge.AddToClassList("web-browser-site-badge");
+            omnibox.Add(siteBadge);
 
             addressField = new TextField
             {
@@ -83,7 +99,7 @@ namespace MF.WebBrowser.Editor
             };
             addressField.AddToClassList("web-browser-address");
             addressField.RegisterCallback<KeyDownEvent>(OnAddressKeyDown);
-            toolbar.Add(addressField);
+            omnibox.Add(addressField);
 
             bookmarkToggleButton = new Button(ToggleCurrentBookmark)
             {
@@ -92,15 +108,17 @@ namespace MF.WebBrowser.Editor
                 tooltip = "Bookmark this page"
             };
             bookmarkToggleButton.AddToClassList("web-browser-bookmark-toggle");
-            toolbar.Add(bookmarkToggleButton);
+            omnibox.Add(bookmarkToggleButton);
 
             var goButton = new Button(() => Navigate(addressField.value))
             {
                 name = "goButton",
-                text = "Go"
+                text = "↵",
+                tooltip = "Go to address"
             };
             goButton.AddToClassList("web-browser-go-button");
-            toolbar.Add(goButton);
+            omnibox.Add(goButton);
+            toolbar.Add(omnibox);
             rootVisualElement.Add(toolbar);
 
             var bookmarkBar = new VisualElement
@@ -109,7 +127,7 @@ namespace MF.WebBrowser.Editor
             };
             bookmarkBar.AddToClassList("web-browser-bookmark-bar");
 
-            var bookmarkIcon = new Label("★")
+            var bookmarkIcon = new Label("▦")
             {
                 tooltip = "Bookmarks"
             };
@@ -180,7 +198,7 @@ namespace MF.WebBrowser.Editor
                 url = $"https://{url}";
 
             addressField.SetValueWithoutNotify(url);
-            statusLabel.text = $"Loading {url}";
+            SetStatus($"Loading {url}", true);
             browser?.Navigate(url);
         }
 
@@ -327,7 +345,7 @@ namespace MF.WebBrowser.Editor
             {
                 bookmark = new BookmarkEntry(GetDefaultTitle(url), url, BookmarkBarFolder);
                 bookmarkCollection.Items.Add(bookmark);
-                statusLabel.text = "Bookmark added";
+                SetStatus("Bookmark added", false);
                 SaveBookmarks();
                 RefreshBookmarkBar();
                 UpdateBookmarkToggle();
@@ -374,9 +392,9 @@ namespace MF.WebBrowser.Editor
                 SaveBookmarks();
                 RefreshBookmarkBar();
                 UpdateBookmarkToggle();
-                statusLabel.text = editingBookmarkIsNew
-                    ? "Bookmark added"
-                    : "Bookmark updated";
+                SetStatus(
+                    editingBookmarkIsNew ? "Bookmark added" : "Bookmark updated",
+                    false);
             }
 
             editingBookmark = null;
@@ -396,7 +414,7 @@ namespace MF.WebBrowser.Editor
             RefreshBookmarkBar();
             UpdateBookmarkToggle();
             bookmarkEditorOverlay.AddToClassList("bookmark-dialog-overlay--hidden");
-            statusLabel.text = "Bookmark removed";
+            SetStatus("Bookmark removed", false);
         }
 
         private void RefreshBookmarkBar()
@@ -451,10 +469,19 @@ namespace MF.WebBrowser.Editor
         {
             var button = new Button(() => Navigate(bookmark.Url))
             {
-                text = bookmark.Title,
+                text = string.Empty,
                 tooltip = bookmark.Url
             };
             button.AddToClassList("web-browser-bookmark-entry");
+
+            var icon = new Label(GetBookmarkGlyph(bookmark.Url));
+            icon.AddToClassList("web-browser-bookmark-entry-icon");
+            button.Add(icon);
+
+            var title = new Label(bookmark.Title);
+            title.AddToClassList("web-browser-bookmark-entry-title");
+            button.Add(title);
+
             button.AddManipulator(new ContextualMenuManipulator(evt =>
             {
                 evt.menu.AppendAction("Open", _ => Navigate(bookmark.Url));
@@ -474,7 +501,7 @@ namespace MF.WebBrowser.Editor
             SaveBookmarks();
             RefreshBookmarkBar();
             UpdateBookmarkToggle();
-            statusLabel.text = "Bookmark removed";
+            SetStatus("Bookmark removed", false);
         }
 
         private void UpdateBookmarkToggle()
@@ -484,6 +511,9 @@ namespace MF.WebBrowser.Editor
 
             var bookmarked = FindBookmarkIndex(addressField?.value) >= 0;
             bookmarkToggleButton.text = bookmarked ? "★" : "☆";
+            bookmarkToggleButton.EnableInClassList(
+                "web-browser-bookmark-toggle--active",
+                bookmarked);
             bookmarkToggleButton.tooltip = bookmarked
                 ? "Edit bookmark"
                 : "Bookmark this page";
@@ -561,13 +591,21 @@ namespace MF.WebBrowser.Editor
                 : char.ToUpperInvariant(title[0]).ToString();
         }
 
+        private void SetStatus(string message, bool visible)
+        {
+            if (statusLabel == null)
+                return;
+
+            statusLabel.text = message;
+            statusLabel.EnableInClassList("web-browser-status--hidden", !visible);
+        }
+
         private void OnNavigationCompleted(string url, bool succeeded)
         {
             if (!string.IsNullOrEmpty(url))
                 addressField?.SetValueWithoutNotify(url);
 
-            if (statusLabel != null)
-                statusLabel.text = succeeded ? "Ready" : $"Failed to load {url}";
+            SetStatus(succeeded ? "Ready" : $"Failed to load {url}", !succeeded);
 
             UpdateBookmarkToggle();
         }
@@ -588,13 +626,11 @@ namespace MF.WebBrowser.Editor
             {
                 case PlayModeStateChange.ExitingEditMode:
                     browser?.Suspend();
-                    if (statusLabel != null)
-                        statusLabel.text = "Paused during Play Mode";
+                    SetStatus("Paused during Play Mode", true);
                     break;
 
                 case PlayModeStateChange.EnteredEditMode:
-                    if (statusLabel != null)
-                        statusLabel.text = "Starting WebView…";
+                    SetStatus("Starting WebView…", true);
                     browser?.Resume();
                     break;
             }

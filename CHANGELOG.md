@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.0] - 2026-11-15
+
+- Redesigned the editor window with a Chrome-inspired toolbar and omnibox.
+- Moved bookmark and navigation actions into the rounded address bar.
+- Added favicon-style monograms to bookmark bar entries.
+
 ## [0.3.0] - 2026-11-15
 
 - Added a Chrome-style bookmark editor with editable names and folders.
