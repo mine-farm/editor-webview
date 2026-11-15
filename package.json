@@ -1,0 +1,22 @@
+{
+  "name": "com.mine-farm.editor-webview",
+  "version": "0.1.0",
+  "displayName": "Editor WebView",
+  "description": "A dockable web browser window for the Unity Editor.",
+  "unity": "6000.3",
+  "documentationUrl": "https://github.com/mine-farm/editor-webview#readme",
+  "changelogUrl": "https://github.com/mine-farm/editor-webview/blob/main/CHANGELOG.md",
+  "dependencies": {
+    "com.webviewtoolkit.core": "1.3.0"
+  },
+  "keywords": [
+    "editor",
+    "webview",
+    "browser",
+    "webview2"
+  ],
+  "author": {
+    "name": "mine-farm",
+    "url": "https://github.com/mine-farm"
+  }
+}

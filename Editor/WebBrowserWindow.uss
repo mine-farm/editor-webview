@@ -1,0 +1,49 @@
+.web-browser-root {
+    flex-grow: 1;
+    background-color: #252525;
+}
+
+.web-browser-toolbar {
+    height: 38px;
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: center;
+    padding: 4px 6px;
+    background-color: #303030;
+    border-bottom-width: 1px;
+    border-bottom-color: #191919;
+}
+
+.web-browser-nav-button {
+    width: 32px;
+    height: 28px;
+    margin-right: 4px;
+}
+
+.web-browser-address {
+    height: 28px;
+    flex-grow: 1;
+    margin-left: 2px;
+    margin-right: 4px;
+}
+
+.web-browser-go-button {
+    width: 44px;
+    height: 28px;
+}
+
+.web-browser-content {
+    flex-grow: 1;
+}
+
+.web-browser-status {
+    height: 22px;
+    flex-shrink: 0;
+    padding-left: 8px;
+    padding-top: 3px;
+    color: #b8b8b8;
+    background-color: #303030;
+    border-top-width: 1px;
+    border-top-color: #191919;
+    font-size: 11px;
+}
