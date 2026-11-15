@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.0] - 2026-11-15
+
+- Added named bookmark folders to the bookmark bar.
+- Added click-to-open folder menus with favicon-style bookmark rows.
+- Added inline folder creation to the bookmark editor.
+
 ## [0.4.0] - 2026-11-15
 
 - Redesigned the editor window with a Chrome-inspired toolbar and omnibox.

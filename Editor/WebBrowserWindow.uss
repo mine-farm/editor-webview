@@ -218,9 +218,10 @@
     -unity-text-align: middle-left;
 }
 
-.web-browser-other-bookmarks {
+.web-browser-bookmark-folder {
     height: 28px;
-    max-width: 160px;
+    max-width: 180px;
+    margin-right: 3px;
     padding-left: 9px;
     padding-right: 7px;
     color: #d8d8d8;
@@ -235,8 +236,13 @@
     border-bottom-right-radius: 5px;
 }
 
-.web-browser-other-bookmarks:hover {
+.web-browser-bookmark-folder:hover {
     background-color: #3c4043;
+}
+
+.web-browser-other-bookmarks {
+    max-width: 160px;
+    margin-right: 0;
 }
 
 .web-browser-content {
@@ -373,6 +379,10 @@
     flex-direction: row;
     align-items: center;
     margin-bottom: 4px;
+}
+
+.bookmark-dialog-new-folder--hidden {
+    display: none;
 }
 
 .bookmark-dialog-field-label {

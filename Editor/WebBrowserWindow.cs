@@ -13,13 +13,15 @@ namespace MF.WebBrowser.Editor
         private const string BookmarksPrefsKey = "MF.WebBrowser.Editor.Bookmarks";
         private const string BookmarkBarFolder = "북마크 바";
         private const string OtherBookmarksFolder = "기타 북마크";
+        private const string NewFolderOption = "새 폴더 만들기…";
         private const string StyleSheetPath =
             "Packages/com.mine-farm.editor-webview/Editor/WebBrowserWindow.uss";
 
-        private static readonly List<string> BookmarkFolders = new()
+        private static readonly List<string> DefaultBookmarkFolders = new()
         {
             BookmarkBarFolder,
-            OtherBookmarksFolder
+            OtherBookmarksFolder,
+            NewFolderOption
         };
 
         private FixedWebViewElement browser;
@@ -32,6 +34,8 @@ namespace MF.WebBrowser.Editor
         private Label bookmarkPreviewGlyph;
         private TextField bookmarkNameField;
         private PopupField<string> bookmarkFolderField;
+        private VisualElement bookmarkNewFolderRow;
+        private TextField bookmarkNewFolderField;
         private Label statusLabel;
         private BookmarkCollection bookmarkCollection = new();
         private BookmarkEntry editingBookmark;
@@ -295,13 +299,43 @@ namespace MF.WebBrowser.Editor
             folderLabel.AddToClassList("bookmark-dialog-field-label");
             folderRow.Add(folderLabel);
 
-            bookmarkFolderField = new PopupField<string>(BookmarkFolders, 0)
+            bookmarkFolderField = new PopupField<string>(
+                new List<string>(DefaultBookmarkFolders),
+                0)
             {
                 name = "bookmarkFolderField"
             };
             bookmarkFolderField.AddToClassList("bookmark-dialog-folder");
+            bookmarkFolderField.RegisterValueChangedCallback(evt =>
+                ToggleNewFolderField(evt.newValue == NewFolderOption));
             folderRow.Add(bookmarkFolderField);
             fields.Add(folderRow);
+
+            bookmarkNewFolderRow = new VisualElement
+            {
+                name = "bookmarkNewFolderRow"
+            };
+            bookmarkNewFolderRow.AddToClassList("bookmark-dialog-field-row");
+            bookmarkNewFolderRow.AddToClassList("bookmark-dialog-new-folder--hidden");
+            var newFolderLabel = new Label("새 폴더");
+            newFolderLabel.AddToClassList("bookmark-dialog-field-label");
+            bookmarkNewFolderRow.Add(newFolderLabel);
+
+            bookmarkNewFolderField = new TextField
+            {
+                name = "bookmarkNewFolderField"
+            };
+            bookmarkNewFolderField.AddToClassList("bookmark-dialog-input");
+            bookmarkNewFolderField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter)
+                    return;
+
+                FinishBookmarkEditor(true);
+                evt.StopPropagation();
+            });
+            bookmarkNewFolderRow.Add(bookmarkNewFolderField);
+            fields.Add(bookmarkNewFolderRow);
 
             body.Add(fields);
             dialog.Add(body);
@@ -367,7 +401,14 @@ namespace MF.WebBrowser.Editor
             editingBookmarkIsNew = isNew;
             bookmarkEditorTitle.text = isNew ? "북마크 추가됨" : "북마크 수정";
             bookmarkNameField.SetValueWithoutNotify(bookmark.Title);
-            bookmarkFolderField.SetValueWithoutNotify(NormalizeFolder(bookmark.Folder));
+            var normalizedFolder = NormalizeFolder(bookmark.Folder);
+            var folderChoices = BuildBookmarkFolderChoices();
+            if (!folderChoices.Contains(normalizedFolder))
+                folderChoices.Insert(folderChoices.Count - 2, normalizedFolder);
+            bookmarkFolderField.choices = folderChoices;
+            bookmarkFolderField.SetValueWithoutNotify(normalizedFolder);
+            bookmarkNewFolderField.SetValueWithoutNotify(string.Empty);
+            ToggleNewFolderField(false);
             bookmarkPreviewGlyph.text = GetBookmarkGlyph(bookmark.Url);
             bookmarkEditorOverlay.RemoveFromClassList("bookmark-dialog-overlay--hidden");
             bookmarkEditorOverlay.BringToFront();
@@ -375,6 +416,45 @@ namespace MF.WebBrowser.Editor
             {
                 bookmarkNameField.Focus();
                 bookmarkNameField.SelectAll();
+            });
+        }
+
+        private List<string> BuildBookmarkFolderChoices()
+        {
+            var choices = new List<string> { BookmarkBarFolder };
+            foreach (var bookmark in bookmarkCollection.Items)
+            {
+                var folder = NormalizeFolder(bookmark.Folder);
+                if (folder == BookmarkBarFolder ||
+                    folder == OtherBookmarksFolder ||
+                    choices.Contains(folder))
+                {
+                    continue;
+                }
+
+                choices.Add(folder);
+            }
+
+            choices.Add(OtherBookmarksFolder);
+            choices.Add(NewFolderOption);
+            return choices;
+        }
+
+        private void ToggleNewFolderField(bool visible)
+        {
+            if (bookmarkNewFolderRow == null)
+                return;
+
+            bookmarkNewFolderRow.EnableInClassList(
+                "bookmark-dialog-new-folder--hidden",
+                !visible);
+            if (!visible)
+                return;
+
+            bookmarkNewFolderField.schedule.Execute(() =>
+            {
+                bookmarkNewFolderField.Focus();
+                bookmarkNewFolderField.SelectAll();
             });
         }
 
@@ -388,7 +468,15 @@ namespace MF.WebBrowser.Editor
                 editingBookmark.Title = string.IsNullOrWhiteSpace(bookmarkNameField.value)
                     ? GetDefaultTitle(editingBookmark.Url)
                     : bookmarkNameField.value.Trim();
-                editingBookmark.Folder = NormalizeFolder(bookmarkFolderField.value);
+                var selectedFolder = bookmarkFolderField.value;
+                if (selectedFolder == NewFolderOption)
+                {
+                    selectedFolder = string.IsNullOrWhiteSpace(bookmarkNewFolderField.value)
+                        ? BookmarkBarFolder
+                        : bookmarkNewFolderField.value.Trim();
+                }
+
+                editingBookmark.Folder = NormalizeFolder(selectedFolder);
                 SaveBookmarks();
                 RefreshBookmarkBar();
                 UpdateBookmarkToggle();
@@ -399,6 +487,8 @@ namespace MF.WebBrowser.Editor
 
             editingBookmark = null;
             editingBookmarkIsNew = false;
+            bookmarkNewFolderField.SetValueWithoutNotify(string.Empty);
+            ToggleNewFolderField(false);
             bookmarkEditorOverlay.AddToClassList("bookmark-dialog-overlay--hidden");
         }
 
@@ -425,44 +515,75 @@ namespace MF.WebBrowser.Editor
             bookmarkItems.Clear();
             bookmarkBarActions.Clear();
 
-            var bookmarkBarCount = 0;
-            var otherBookmarks = new List<BookmarkEntry>();
+            var visibleEntryCount = 0;
+            var folderOrder = new List<string>();
+            var folderGroups = new Dictionary<string, List<BookmarkEntry>>(
+                StringComparer.Ordinal);
             foreach (var bookmark in bookmarkCollection.Items)
             {
-                if (NormalizeFolder(bookmark.Folder) == OtherBookmarksFolder)
+                var folder = NormalizeFolder(bookmark.Folder);
+                if (folder == BookmarkBarFolder)
                 {
-                    otherBookmarks.Add(bookmark);
+                    visibleEntryCount++;
+                    bookmarkItems.Add(CreateBookmarkButton(bookmark));
                     continue;
                 }
 
-                bookmarkBarCount++;
-                bookmarkItems.Add(CreateBookmarkButton(bookmark));
+                if (!folderGroups.TryGetValue(folder, out var entries))
+                {
+                    entries = new List<BookmarkEntry>();
+                    folderGroups.Add(folder, entries);
+                    folderOrder.Add(folder);
+                }
+
+                entries.Add(bookmark);
             }
 
-            if (bookmarkBarCount == 0)
+            foreach (var folder in folderOrder)
+            {
+                if (folder == OtherBookmarksFolder)
+                    continue;
+
+                visibleEntryCount++;
+                bookmarkItems.Add(CreateBookmarkFolderMenu(folder, folderGroups[folder]));
+            }
+
+            if (visibleEntryCount == 0)
             {
                 var emptyLabel = new Label("북마크 없음 — ☆를 눌러 추가");
                 emptyLabel.AddToClassList("web-browser-bookmark-empty");
                 bookmarkItems.Add(emptyLabel);
             }
 
-            if (otherBookmarks.Count == 0)
+            if (!folderGroups.TryGetValue(OtherBookmarksFolder, out var otherBookmarks))
                 return;
 
-            var otherMenu = new ToolbarMenu
-            {
-                text = $"기타 북마크 ({otherBookmarks.Count})",
-                tooltip = "기타 북마크 열기"
-            };
+            var otherMenu = CreateBookmarkFolderMenu(
+                OtherBookmarksFolder,
+                otherBookmarks);
             otherMenu.AddToClassList("web-browser-other-bookmarks");
-            foreach (var bookmark in otherBookmarks)
+            bookmarkBarActions.Add(otherMenu);
+        }
+
+        private ToolbarMenu CreateBookmarkFolderMenu(
+            string folderName,
+            List<BookmarkEntry> bookmarks)
+        {
+            var folderMenu = new ToolbarMenu
+            {
+                text = $"▱  {folderName}",
+                tooltip = $"{folderName} · {bookmarks.Count}개 북마크"
+            };
+            folderMenu.AddToClassList("web-browser-bookmark-folder");
+            foreach (var bookmark in bookmarks)
             {
                 var capturedBookmark = bookmark;
-                otherMenu.menu.AppendAction(
-                    capturedBookmark.Title,
+                folderMenu.menu.AppendAction(
+                    $"{GetBookmarkGlyph(capturedBookmark.Url)}   {capturedBookmark.Title}",
                     _ => Navigate(capturedBookmark.Url));
             }
-            bookmarkBarActions.Add(otherMenu);
+
+            return folderMenu;
         }
 
         private Button CreateBookmarkButton(BookmarkEntry bookmark)
@@ -565,9 +686,19 @@ namespace MF.WebBrowser.Editor
 
         private static string NormalizeFolder(string folder)
         {
-            return string.Equals(folder, OtherBookmarksFolder, StringComparison.Ordinal)
-                ? OtherBookmarksFolder
-                : BookmarkBarFolder;
+            if (string.IsNullOrWhiteSpace(folder) ||
+                string.Equals(folder, NewFolderOption, StringComparison.Ordinal))
+            {
+                return BookmarkBarFolder;
+            }
+
+            var trimmed = folder.Trim();
+            if (string.Equals(trimmed, BookmarkBarFolder, StringComparison.Ordinal))
+                return BookmarkBarFolder;
+            if (string.Equals(trimmed, OtherBookmarksFolder, StringComparison.Ordinal))
+                return OtherBookmarksFolder;
+
+            return trimmed;
         }
 
         private static string GetDefaultTitle(string url)

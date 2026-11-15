@@ -35,9 +35,11 @@ refresh, a rounded omnibox, and a persistent bookmark bar. Click `☆` inside th
 omnibox to add the current page and open the
 bookmark editor, where its name and destination folder can be changed. Bookmark
 bar entries remain visible for one-click navigation; entries moved to `Other
-Bookmarks` are available from the menu at the right of the bar. Right-click a
-bookmark to edit it, copy its URL, or remove it. Only one native WebView is kept
-active at a time, and it is suspended while entering Play Mode.
+Bookmarks` are available from the folder menu at the right of the bar. Choose
+`새 폴더 만들기…` in the bookmark editor to create a named folder. Named folders are
+shown directly on the bookmark bar and open their bookmark list when clicked.
+Right-click a bookmark to edit it, copy its URL, or remove it. Only one native
+WebView is kept active at a time, and it is suspended while entering Play Mode.
 
 ## Current limitations
 
