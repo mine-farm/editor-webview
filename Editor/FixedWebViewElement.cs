@@ -52,7 +52,7 @@ namespace MF.WebBrowser.Editor
         public FixedWebViewElement(string initialUrl)
         {
             this.initialUrl = initialUrl;
-            scaleMode = ScaleMode.StretchToFill;
+            scaleMode = ScaleMode.ScaleToFit;
             focusable = true;
             pickingMode = PickingMode.Position;
 
@@ -381,11 +381,13 @@ namespace MF.WebBrowser.Editor
 
         private void OnMouseDown(MouseDownEvent evt)
         {
-            if (handle == 0)
+            if (!SendMouseEvent(
+                    MouseEventType.Down,
+                    ConvertMouseButton(evt.button),
+                    evt.localMousePosition))
                 return;
 
             Focus();
-            SendMouseEvent(MouseEventType.Down, ConvertMouseButton(evt.button), evt.localMousePosition);
             this.CaptureMouse();
             evt.StopPropagation();
         }
@@ -395,28 +397,38 @@ namespace MF.WebBrowser.Editor
             if (handle == 0)
                 return;
 
-            SendMouseEvent(MouseEventType.Up, ConvertMouseButton(evt.button), evt.localMousePosition);
-            if (this.HasMouseCapture())
+            var hadMouseCapture = this.HasMouseCapture();
+            var sent = SendMouseEvent(
+                MouseEventType.Up,
+                ConvertMouseButton(evt.button),
+                evt.localMousePosition,
+                hadMouseCapture);
+            if (hadMouseCapture)
                 this.ReleaseMouse();
-            evt.StopPropagation();
+            if (sent)
+                evt.StopPropagation();
         }
 
         private void OnMouseMove(MouseMoveEvent evt)
         {
             if (handle != 0)
-                SendMouseEvent(MouseEventType.Move, NativeMouseButton.None, evt.localMousePosition);
+                SendMouseEvent(
+                    MouseEventType.Move,
+                    NativeMouseButton.None,
+                    evt.localMousePosition,
+                    this.HasMouseCapture());
         }
 
         private void OnMouseWheel(WheelEvent evt)
         {
-            if (handle == 0)
+            if (!SendMouseEvent(
+                    MouseEventType.Wheel,
+                    NativeMouseButton.None,
+                    evt.localMousePosition,
+                    false,
+                    -evt.delta.y))
                 return;
 
-            SendMouseEvent(
-                MouseEventType.Wheel,
-                NativeMouseButton.None,
-                evt.localMousePosition,
-                -evt.delta.y);
             evt.StopImmediatePropagation();
         }
 
@@ -425,24 +437,70 @@ namespace MF.WebBrowser.Editor
             SendMouseEvent(MouseEventType.Leave, NativeMouseButton.None, Vector2.zero);
         }
 
-        private void SendMouseEvent(
+        private bool SendMouseEvent(
             MouseEventType eventType,
             NativeMouseButton button,
             Vector2 localPosition,
+            bool clampToViewport = false,
             float wheelDelta = 0f)
         {
-            if (handle == 0 || resolvedStyle.width <= 0f || resolvedStyle.height <= 0f)
-                return;
+            if (handle == 0)
+                return false;
 
-            var normalizedX = Mathf.Clamp01(localPosition.x / resolvedStyle.width);
-            var normalizedY = Mathf.Clamp01(localPosition.y / resolvedStyle.height);
-            WebViewNative.WebViewToolkit_SendMouseEvent(
-                handle,
-                (int)eventType,
-                (int)button,
-                normalizedX,
-                normalizedY,
-                wheelDelta);
+            if (eventType == MouseEventType.Leave)
+            {
+                return (NativeResult)WebViewNative.WebViewToolkit_SendMouseEvent(
+                           handle,
+                           (int)eventType,
+                           (int)button,
+                           0f,
+                           0f,
+                           wheelDelta) == NativeResult.Success;
+            }
+
+            var viewport = GetRenderedViewport();
+            if (viewport.width <= 0f || viewport.height <= 0f ||
+                (!clampToViewport && !viewport.Contains(localPosition)))
+                return false;
+
+            var viewportPosition = new Vector2(
+                Mathf.Clamp(localPosition.x, viewport.xMin, viewport.xMax),
+                Mathf.Clamp(localPosition.y, viewport.yMin, viewport.yMax));
+            var normalizedX = Mathf.Clamp01((viewportPosition.x - viewport.xMin) / viewport.width);
+            var normalizedY = Mathf.Clamp01((viewportPosition.y - viewport.yMin) / viewport.height);
+            return (NativeResult)WebViewNative.WebViewToolkit_SendMouseEvent(
+                       handle,
+                       (int)eventType,
+                       (int)button,
+                       normalizedX,
+                       normalizedY,
+                       wheelDelta) == NativeResult.Success;
+        }
+
+        private Rect GetRenderedViewport()
+        {
+            var available = contentRect;
+            if (available.width <= 0f || available.height <= 0f)
+                return Rect.zero;
+
+            var renderAspect = RenderWidth / (float)RenderHeight;
+            var availableAspect = available.width / available.height;
+            if (availableAspect > renderAspect)
+            {
+                var width = available.height * renderAspect;
+                return new Rect(
+                    available.x + (available.width - width) * 0.5f,
+                    available.y,
+                    width,
+                    available.height);
+            }
+
+            var height = available.width / renderAspect;
+            return new Rect(
+                available.x,
+                available.y + (available.height - height) * 0.5f,
+                available.width,
+                height);
         }
 
         private void OnKeyDown(KeyDownEvent evt)

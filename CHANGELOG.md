@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.1] - 2026-11-15
+
+- Kept web page rendering at a fixed 16:9 aspect ratio.
+- Corrected pointer coordinates for the letterboxed or pillarboxed viewport.
+
 ## [0.9.0] - 2026-11-15
 
 - Added independent multi-tab Editor WebViews.

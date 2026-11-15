@@ -247,6 +247,7 @@
 
 .web-browser-content {
     flex-grow: 1;
+    background-color: #000000;
 }
 
 .web-browser-status {
