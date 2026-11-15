@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0] - 2026-11-15
+
+- Moved WebViewToolkit's native capture host off-screen to remove the Windows
+  Graphics Capture yellow border from the Unity Editor.
+- Disabled direct input on the native host so pointer input is handled only by
+  the docked UI Toolkit browser element.
+
 ## [0.5.0] - 2026-11-15
 
 - Added named bookmark folders to the bookmark bar.

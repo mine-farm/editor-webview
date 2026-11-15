@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -13,6 +14,16 @@ namespace MF.WebBrowser.Editor
     {
         private const int RenderWidth = 1280;
         private const int RenderHeight = 720;
+        private const double HostWindowQuarantineInterval = 1d;
+
+#if UNITY_EDITOR_WIN
+        private const string NativeHostWindowClass = "WebViewToolkitHostWindow";
+        private const string NativeHostWindowTitle = "WebViewToolkitHost";
+        private const int NativeHostOffscreenPosition = -32000;
+        private const uint SwpNoSize = 0x0001;
+        private const uint SwpNoZOrder = 0x0004;
+        private const uint SwpNoActivate = 0x0010;
+#endif
 
         private static FixedWebViewElement activeOwner;
         private static readonly LogCallback LogCallback = OnNativeLog;
@@ -31,6 +42,11 @@ namespace MF.WebBrowser.Editor
         private bool refreshTexture;
         private bool disposed;
         private string currentUrl;
+        private double nextHostWindowQuarantineAt;
+
+#if UNITY_EDITOR_WIN
+        private IntPtr nativeHostWindow;
+#endif
 
         public event Action<string, bool> NavigationCompleted;
 
@@ -168,6 +184,8 @@ namespace MF.WebBrowser.Editor
                 return;
             }
 
+            QuarantineNativeHostWindow();
+
             var nativeTexture = WebViewNative.WebViewToolkit_GetTexturePtr(handle);
             if (nativeTexture == IntPtr.Zero)
             {
@@ -221,6 +239,10 @@ namespace MF.WebBrowser.Editor
             renderEventFunction = IntPtr.Zero;
             refreshTexture = false;
             currentUrl = null;
+            nextHostWindowQuarantineAt = 0d;
+#if UNITY_EDITOR_WIN
+            nativeHostWindow = IntPtr.Zero;
+#endif
             while (navigationResults.TryDequeue(out _)) { }
             while (nativeLogs.TryDequeue(out _)) { }
 
@@ -232,6 +254,13 @@ namespace MF.WebBrowser.Editor
         {
             if (disposed || handle == 0)
                 return;
+
+            if (EditorApplication.timeSinceStartup >= nextHostWindowQuarantineAt)
+            {
+                QuarantineNativeHostWindow();
+                nextHostWindowQuarantineAt =
+                    EditorApplication.timeSinceStartup + HostWindowQuarantineInterval;
+            }
 
             if (refreshTexture)
             {
@@ -260,6 +289,83 @@ namespace MF.WebBrowser.Editor
 
             MarkDirtyRepaint();
         }
+
+        private void QuarantineNativeHostWindow()
+        {
+#if UNITY_EDITOR_WIN
+            if (nativeHostWindow == IntPtr.Zero || !IsWindow(nativeHostWindow))
+                nativeHostWindow = FindNativeHostWindow();
+
+            if (nativeHostWindow == IntPtr.Zero)
+                return;
+
+            // WebViewToolkit captures a real top-level HWND. Keeping it on-screen
+            // exposes Windows Graphics Capture's yellow border and a 1280x720 input
+            // surface over the Editor. It must stay visible for capture, so park it
+            // off-screen and disable native input; UI Toolkit forwards input instead.
+            EnableWindow(nativeHostWindow, false);
+            SetWindowPos(
+                nativeHostWindow,
+                IntPtr.Zero,
+                NativeHostOffscreenPosition,
+                NativeHostOffscreenPosition,
+                0,
+                0,
+                SwpNoSize | SwpNoZOrder | SwpNoActivate);
+#endif
+        }
+
+#if UNITY_EDITOR_WIN
+        private static IntPtr FindNativeHostWindow()
+        {
+            var currentProcessId = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
+            var candidate = IntPtr.Zero;
+
+            while ((candidate = FindWindowEx(
+                       IntPtr.Zero,
+                       candidate,
+                       NativeHostWindowClass,
+                       NativeHostWindowTitle)) != IntPtr.Zero)
+            {
+                GetWindowThreadProcessId(candidate, out var ownerProcessId);
+                if (ownerProcessId == currentProcessId)
+                    return candidate;
+            }
+
+            return IntPtr.Zero;
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr FindWindowEx(
+            IntPtr parent,
+            IntPtr childAfter,
+            string className,
+            string windowName);
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(
+            IntPtr window,
+            out uint processId);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindow(IntPtr window);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool EnableWindow(IntPtr window, bool enable);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetWindowPos(
+            IntPtr window,
+            IntPtr insertAfter,
+            int x,
+            int y,
+            int width,
+            int height,
+            uint flags);
+#endif
 
         private void OnMouseDown(MouseDownEvent evt)
         {
