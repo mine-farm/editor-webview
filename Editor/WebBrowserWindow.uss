@@ -65,6 +65,12 @@
     overflow: hidden;
 }
 
+.web-browser-bookmark-actions {
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: center;
+}
+
 .web-browser-bookmark-entry {
     height: 24px;
     max-width: 180px;
@@ -92,10 +98,21 @@
     -unity-text-align: middle-left;
 }
 
-.web-browser-bookmark-rename {
-    width: 140px;
+.web-browser-other-bookmarks {
     height: 24px;
-    margin-right: 3px;
+    max-width: 150px;
+    padding-left: 8px;
+    padding-right: 6px;
+    color: #d8d8d8;
+    background-color: transparent;
+    border-left-width: 0;
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+}
+
+.web-browser-other-bookmarks:hover {
+    background-color: #474747;
 }
 
 .web-browser-content {
@@ -112,4 +129,212 @@
     border-top-width: 1px;
     border-top-color: #191919;
     font-size: 11px;
+}
+
+.bookmark-dialog-overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: flex-end;
+    padding-top: 44px;
+    padding-right: 10px;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.bookmark-dialog-overlay--hidden {
+    display: none;
+}
+
+.bookmark-dialog {
+    width: 430px;
+    padding: 14px;
+    background-color: #202124;
+    border-left-width: 1px;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: #56585d;
+    border-top-color: #56585d;
+    border-right-color: #56585d;
+    border-bottom-color: #56585d;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.bookmark-dialog-header {
+    height: 30px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.bookmark-dialog-title {
+    flex-grow: 1;
+    color: #f1f3f4;
+    font-size: 16px;
+    -unity-font-style: bold;
+}
+
+.bookmark-dialog-close {
+    width: 28px;
+    height: 28px;
+    padding-left: 0;
+    padding-right: 0;
+    color: #c5c7cb;
+    font-size: 20px;
+    background-color: transparent;
+    border-left-width: 0;
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
+}
+
+.bookmark-dialog-close:hover {
+    background-color: #35373b;
+}
+
+.bookmark-dialog-body {
+    flex-direction: row;
+    align-items: center;
+}
+
+.bookmark-dialog-preview {
+    width: 102px;
+    height: 102px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: #0d0e10;
+    border-left-width: 1px;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: #55575c;
+    border-top-color: #55575c;
+    border-right-color: #55575c;
+    border-bottom-color: #55575c;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.bookmark-dialog-preview-glyph {
+    color: #f1f3f4;
+    font-size: 30px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.bookmark-dialog-fields {
+    flex-grow: 1;
+    margin-left: 16px;
+}
+
+.bookmark-dialog-field-row {
+    height: 42px;
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.bookmark-dialog-field-label {
+    width: 42px;
+    flex-shrink: 0;
+    color: #f1f3f4;
+    font-size: 12px;
+}
+
+.bookmark-dialog-input,
+.bookmark-dialog-folder {
+    height: 36px;
+    flex-grow: 1;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.bookmark-dialog-input > .unity-text-field__input,
+.bookmark-dialog-input > .unity-base-text-field__input,
+.bookmark-dialog-folder > .unity-base-popup-field__input {
+    color: #f1f3f4;
+    background-color: #292a2d;
+    border-left-width: 1px;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-color: #73767c;
+    border-top-color: #73767c;
+    border-right-color: #73767c;
+    border-bottom-color: #73767c;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.bookmark-dialog-input:focus > .unity-text-field__input,
+.bookmark-dialog-input:focus > .unity-base-text-field__input,
+.bookmark-dialog-folder:focus > .unity-base-popup-field__input {
+    border-left-width: 2px;
+    border-top-width: 2px;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+    border-left-color: #9bb9ff;
+    border-top-color: #9bb9ff;
+    border-right-color: #9bb9ff;
+    border-bottom-color: #9bb9ff;
+}
+
+.bookmark-dialog-footer {
+    height: 48px;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.bookmark-dialog-button {
+    height: 38px;
+    min-width: 66px;
+    margin-left: 10px;
+    padding-left: 18px;
+    padding-right: 18px;
+    border-left-width: 0;
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-top-left-radius: 19px;
+    border-top-right-radius: 19px;
+    border-bottom-left-radius: 19px;
+    border-bottom-right-radius: 19px;
+    font-size: 12px;
+}
+
+.bookmark-dialog-done {
+    color: #172033;
+    background-color: #a9c3ff;
+}
+
+.bookmark-dialog-done:hover {
+    background-color: #bed2ff;
+}
+
+.bookmark-dialog-delete {
+    color: #dbe9ff;
+    background-color: #184f86;
+}
+
+.bookmark-dialog-delete:hover {
+    background-color: #24639f;
 }

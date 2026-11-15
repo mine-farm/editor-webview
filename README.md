@@ -31,10 +31,12 @@ must be listed directly alongside this package.
 Open `Window > MF > Web Browser` in the Unity Editor.
 
 The window provides an address bar, back and forward navigation, refresh, home,
-and a persistent bookmark bar. Click `☆` to add or remove the current page.
-Click a bookmark to navigate to it, or right-click it to rename, copy its URL,
-or remove it. Only one native WebView is kept active at a time, and it is
-suspended while entering Play Mode.
+and a persistent bookmark bar. Click `☆` to add the current page and open the
+bookmark editor, where its name and destination folder can be changed. Bookmark
+bar entries remain visible for one-click navigation; entries moved to `Other
+Bookmarks` are available from the menu at the right of the bar. Right-click a
+bookmark to edit it, copy its URL, or remove it. Only one native WebView is kept
+active at a time, and it is suspended while entering Play Mode.
 
 ## Current limitations
 
