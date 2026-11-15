@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.0] - 2026-11-15
+
+- Added a web icon to the Unity Editor dock tab.
+
 ## [0.6.0] - 2026-11-15
 
 - Moved WebViewToolkit's native capture host off-screen to remove the Windows

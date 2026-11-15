@@ -7,6 +7,7 @@ using UnityEngine.UIElements;
 
 namespace MF.WebBrowser.Editor
 {
+    [EditorWindowTitle(title = "Web Browser", icon = "BuildSettings.Web.Small")]
     public sealed class WebBrowserWindow : EditorWindow
     {
         private const string DefaultUrl = "https://www.google.com";
@@ -49,7 +50,9 @@ namespace MF.WebBrowser.Editor
 
         private void OnEnable()
         {
-            titleContent = new GUIContent("Web Browser");
+            titleContent = EditorGUIUtility.TrTextContentWithIcon(
+                "Web Browser",
+                "BuildSettings.Web.Small");
             minSize = new Vector2(560f, 360f);
             AssemblyReloadEvents.beforeAssemblyReload += DisposeBrowser;
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
