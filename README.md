@@ -30,8 +30,10 @@ must be listed directly alongside this package.
 
 Open `Window > MF > Web Browser` in the Unity Editor.
 
-The window provides an address bar, back and forward navigation, refresh, and
-home controls. Only one native WebView is kept active at a time, and it is
+The window provides an address bar, back and forward navigation, refresh, home,
+and a persistent bookmark bar. Click `☆` to add or remove the current page.
+Click a bookmark to navigate to it, or right-click it to rename, copy its URL,
+or remove it. Only one native WebView is kept active at a time, and it is
 suspended while entering Play Mode.
 
 ## Current limitations
