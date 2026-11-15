@@ -12,8 +12,8 @@ namespace MF.WebBrowser.Editor
 {
     internal sealed class FixedWebViewElement : Image, IDisposable
     {
-        private const int RenderWidth = 1280;
-        private const int RenderHeight = 720;
+        private const int RenderWidth = 1920;
+        private const int RenderHeight = 1080;
         private const double RenderUpdateInterval = 0.03d;
         private const double HostWindowQuarantineInterval = 1d;
 

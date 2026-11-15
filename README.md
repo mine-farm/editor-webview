@@ -41,10 +41,10 @@ shown directly on the bookmark bar and open their bookmark list when clicked.
 Right-click a bookmark to edit it, copy its URL, or remove it. Use the `+` toolbar
 button or open `Window > MF > Web Browser` again to create another independent
 browser tab. Open WebViews are suspended while entering Play Mode.
-The fixed 1280x720 backing texture is always displayed at a 16:9 aspect ratio;
+The fixed 1920x1080 backing texture is always displayed at a 16:9 aspect ratio;
 unused space is filled with black letterboxing or pillarboxing.
 
 ## Current limitations
 
 - Windows only
-- Fixed 1280x720 backing texture
+- Fixed 1920x1080 backing texture
