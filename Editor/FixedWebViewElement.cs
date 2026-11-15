@@ -73,8 +73,11 @@ namespace MF.WebBrowser.Editor
             if (handle == 0)
                 return false;
 
-            return (NativeResult)WebViewNative.WebViewToolkit_Navigate(handle, url) ==
-                   NativeResult.Success;
+            var result = (NativeResult)WebViewNative.WebViewToolkit_Navigate(handle, url);
+            if (result == NativeResult.Success)
+                currentUrl = url;
+
+            return result == NativeResult.Success;
         }
 
         public void GoBack()
@@ -102,8 +105,18 @@ namespace MF.WebBrowser.Editor
 
         public void Resume()
         {
-            if (!disposed && panel != null)
-                schedule.Execute(CreateWebView).ExecuteLater(100);
+            if (disposed || panel == null)
+                return;
+
+            if (handle != 0)
+            {
+                tickItem?.Resume();
+                QuarantineNativeHostWindow();
+                MarkDirtyRepaint();
+                return;
+            }
+
+            schedule.Execute(CreateWebView).ExecuteLater(100);
         }
 
         public void Dispose()
@@ -122,7 +135,7 @@ namespace MF.WebBrowser.Editor
 
         private void OnDetachFromPanel(DetachFromPanelEvent evt)
         {
-            ReleaseWebView();
+            tickItem?.Pause();
         }
 
         private void CreateWebView()
@@ -175,7 +188,7 @@ namespace MF.WebBrowser.Editor
                 RenderWidth,
                 RenderHeight,
                 null,
-                initialUrl,
+                string.IsNullOrEmpty(currentUrl) ? initialUrl : currentUrl,
                 0,
                 out handle);
             if (createResult != NativeResult.Success)
@@ -238,7 +251,6 @@ namespace MF.WebBrowser.Editor
 
             renderEventFunction = IntPtr.Zero;
             refreshTexture = false;
-            currentUrl = null;
             nextHostWindowQuarantineAt = 0d;
 #if UNITY_EDITOR_WIN
             nativeHostWindow = IntPtr.Zero;

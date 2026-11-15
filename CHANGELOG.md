@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.0] - 2026-11-15
+
+- Kept the native WebView alive while switching between docked Editor tabs.
+- Restored the last URL after an intentional WebView suspension.
+
 ## [0.7.0] - 2026-11-15
 
 - Added a web icon to the Unity Editor dock tab.
