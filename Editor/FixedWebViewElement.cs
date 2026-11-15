@@ -14,6 +14,7 @@ namespace MF.WebBrowser.Editor
     {
         private const int RenderWidth = 1280;
         private const int RenderHeight = 720;
+        private const double RenderUpdateInterval = 0.03d;
         private const double HostWindowQuarantineInterval = 1d;
 
 #if UNITY_EDITOR_WIN
@@ -25,28 +26,26 @@ namespace MF.WebBrowser.Editor
         private const uint SwpNoActivate = 0x0010;
 #endif
 
-        private static FixedWebViewElement activeOwner;
+        private static readonly ConcurrentDictionary<uint, FixedWebViewElement> Owners = new();
+        private static readonly ConcurrentQueue<NativeLog> NativeLogs = new();
+        private static readonly object NativeLifecycleLock = new();
         private static readonly LogCallback LogCallback = OnNativeLog;
         private static readonly NavigationCallback NavigationCallback = OnNativeNavigation;
         private static readonly MessageCallback MessageCallback = OnNativeMessage;
         private static readonly DeviceEventCallback DeviceEventCallback = OnNativeDeviceEvent;
+        private static IntPtr renderEventFunction;
+        private static bool nativeInitialized;
+        private static double nextRenderUpdateAt;
+        private static double nextHostWindowQuarantineAt;
 
         private readonly string initialUrl;
         private readonly ConcurrentQueue<NavigationResult> navigationResults = new();
-        private readonly ConcurrentQueue<NativeLog> nativeLogs = new();
         private Texture2D displayTexture;
         private IVisualElementScheduledItem tickItem;
-        private IntPtr renderEventFunction;
         private uint handle;
-        private bool nativeInitialized;
         private bool refreshTexture;
         private bool disposed;
         private string currentUrl;
-        private double nextHostWindowQuarantineAt;
-
-#if UNITY_EDITOR_WIN
-        private IntPtr nativeHostWindow;
-#endif
 
         public event Action<string, bool> NavigationCompleted;
 
@@ -111,7 +110,7 @@ namespace MF.WebBrowser.Editor
             if (handle != 0)
             {
                 tickItem?.Resume();
-                QuarantineNativeHostWindow();
+                QuarantineNativeHostWindows();
                 MarkDirtyRepaint();
                 return;
             }
@@ -144,60 +143,27 @@ namespace MF.WebBrowser.Editor
                 EditorApplication.isPlayingOrWillChangePlaymode)
                 return;
 
-            if (activeOwner != null && activeOwner != this)
-                activeOwner.ReleaseWebView();
-
-            activeOwner = this;
-            WebViewNative.WebViewToolkit_SetLogCallback(LogCallback);
-            WebViewNative.WebViewToolkit_SetNavigationCallback(NavigationCallback);
-            WebViewNative.WebViewToolkit_SetMessageCallback(MessageCallback);
-            WebViewNative.WebViewToolkit_SetDeviceEventCallback(DeviceEventCallback);
-
-            var graphicsApi = SystemInfo.graphicsDeviceType switch
-            {
-                GraphicsDeviceType.Direct3D11 => GraphicsAPI.Direct3D11,
-                GraphicsDeviceType.Direct3D12 => GraphicsAPI.Direct3D12,
-                _ => GraphicsAPI.Unknown
-            };
-
-            if (graphicsApi == GraphicsAPI.Unknown)
-            {
-                ReleaseWebView();
+            if (!EnsureNativeInitialized())
                 return;
-            }
 
-            var initializeResult =
-                (NativeResult)WebViewNative.WebViewToolkit_Initialize((int)graphicsApi);
-            if (initializeResult == NativeResult.ErrorAlreadyInitialized)
-            {
-                WebViewNative.WebViewToolkit_Shutdown();
-                initializeResult =
-                    (NativeResult)WebViewNative.WebViewToolkit_Initialize((int)graphicsApi);
-            }
-
-            if (initializeResult != NativeResult.Success)
-            {
-                ReleaseWebView();
-                return;
-            }
-
-            nativeInitialized = true;
-            renderEventFunction = WebViewNative.WebViewToolkit_GetRenderEventFunc();
-
+            var startUrl = string.IsNullOrEmpty(currentUrl) ? initialUrl : currentUrl;
             var createResult = (NativeResult)WebViewNative.WebViewToolkit_CreateWebView(
                 RenderWidth,
                 RenderHeight,
                 null,
-                string.IsNullOrEmpty(currentUrl) ? initialUrl : currentUrl,
+                startUrl,
                 0,
                 out handle);
             if (createResult != NativeResult.Success)
             {
-                ReleaseWebView();
+                handle = 0;
+                ReleaseNativeIfUnused();
                 return;
             }
 
-            QuarantineNativeHostWindow();
+            currentUrl = startUrl;
+            Owners[handle] = this;
+            QuarantineNativeHostWindows();
 
             var nativeTexture = WebViewNative.WebViewToolkit_GetTexturePtr(handle);
             if (nativeTexture == IntPtr.Zero)
@@ -239,27 +205,15 @@ namespace MF.WebBrowser.Editor
 
             if (handle != 0)
             {
-                WebViewNative.WebViewToolkit_DestroyWebView(handle);
+                var releasedHandle = handle;
                 handle = 0;
+                Owners.TryRemove(releasedHandle, out _);
+                WebViewNative.WebViewToolkit_DestroyWebView(releasedHandle);
             }
 
-            if (nativeInitialized)
-            {
-                WebViewNative.WebViewToolkit_Shutdown();
-                nativeInitialized = false;
-            }
-
-            renderEventFunction = IntPtr.Zero;
             refreshTexture = false;
-            nextHostWindowQuarantineAt = 0d;
-#if UNITY_EDITOR_WIN
-            nativeHostWindow = IntPtr.Zero;
-#endif
             while (navigationResults.TryDequeue(out _)) { }
-            while (nativeLogs.TryDequeue(out _)) { }
-
-            if (activeOwner == this)
-                activeOwner = null;
+            ReleaseNativeIfUnused();
         }
 
         private void Tick()
@@ -267,11 +221,11 @@ namespace MF.WebBrowser.Editor
             if (disposed || handle == 0)
                 return;
 
-            if (EditorApplication.timeSinceStartup >= nextHostWindowQuarantineAt)
+            var now = EditorApplication.timeSinceStartup;
+            if (now >= nextHostWindowQuarantineAt)
             {
-                QuarantineNativeHostWindow();
-                nextHostWindowQuarantineAt =
-                    EditorApplication.timeSinceStartup + HostWindowQuarantineInterval;
+                QuarantineNativeHostWindows();
+                nextHostWindowQuarantineAt = now + HostWindowQuarantineInterval;
             }
 
             if (refreshTexture)
@@ -282,8 +236,11 @@ namespace MF.WebBrowser.Editor
                     displayTexture?.UpdateExternalTexture(nativeTexture);
             }
 
-            if (renderEventFunction != IntPtr.Zero)
+            if (renderEventFunction != IntPtr.Zero && now >= nextRenderUpdateAt)
+            {
                 GL.IssuePluginEvent(renderEventFunction, (int)RenderEventType.UpdateTexture);
+                nextRenderUpdateAt = now + RenderUpdateInterval;
+            }
 
             while (navigationResults.TryDequeue(out var result))
             {
@@ -291,7 +248,7 @@ namespace MF.WebBrowser.Editor
                 NavigationCompleted?.Invoke(result.Url, result.Succeeded);
             }
 
-            while (nativeLogs.TryDequeue(out var entry))
+            while (NativeLogs.TryDequeue(out var entry))
             {
                 if (entry.Level == 1)
                     Debug.LogWarning($"[Editor WebView] {entry.Message}");
@@ -302,34 +259,68 @@ namespace MF.WebBrowser.Editor
             MarkDirtyRepaint();
         }
 
-        private void QuarantineNativeHostWindow()
+        private static bool EnsureNativeInitialized()
         {
-#if UNITY_EDITOR_WIN
-            if (nativeHostWindow == IntPtr.Zero || !IsWindow(nativeHostWindow))
-                nativeHostWindow = FindNativeHostWindow();
+            lock (NativeLifecycleLock)
+            {
+                if (nativeInitialized && WebViewNative.WebViewToolkit_IsInitialized() != 0)
+                    return true;
 
-            if (nativeHostWindow == IntPtr.Zero)
-                return;
+                var graphicsApi = SystemInfo.graphicsDeviceType switch
+                {
+                    GraphicsDeviceType.Direct3D11 => GraphicsAPI.Direct3D11,
+                    GraphicsDeviceType.Direct3D12 => GraphicsAPI.Direct3D12,
+                    _ => GraphicsAPI.Unknown
+                };
 
-            // WebViewToolkit captures a real top-level HWND. Keeping it on-screen
-            // exposes Windows Graphics Capture's yellow border and a 1280x720 input
-            // surface over the Editor. It must stay visible for capture, so park it
-            // off-screen and disable native input; UI Toolkit forwards input instead.
-            EnableWindow(nativeHostWindow, false);
-            SetWindowPos(
-                nativeHostWindow,
-                IntPtr.Zero,
-                NativeHostOffscreenPosition,
-                NativeHostOffscreenPosition,
-                0,
-                0,
-                SwpNoSize | SwpNoZOrder | SwpNoActivate);
-#endif
+                if (graphicsApi == GraphicsAPI.Unknown)
+                    return false;
+
+                WebViewNative.WebViewToolkit_SetLogCallback(LogCallback);
+                WebViewNative.WebViewToolkit_SetNavigationCallback(NavigationCallback);
+                WebViewNative.WebViewToolkit_SetMessageCallback(MessageCallback);
+                WebViewNative.WebViewToolkit_SetDeviceEventCallback(DeviceEventCallback);
+
+                var initializeResult =
+                    (NativeResult)WebViewNative.WebViewToolkit_Initialize((int)graphicsApi);
+                if (initializeResult == NativeResult.ErrorAlreadyInitialized)
+                {
+                    WebViewNative.WebViewToolkit_Shutdown();
+                    initializeResult =
+                        (NativeResult)WebViewNative.WebViewToolkit_Initialize((int)graphicsApi);
+                }
+
+                if (initializeResult != NativeResult.Success)
+                    return false;
+
+                renderEventFunction = WebViewNative.WebViewToolkit_GetRenderEventFunc();
+                nativeInitialized = renderEventFunction != IntPtr.Zero;
+                if (!nativeInitialized)
+                    WebViewNative.WebViewToolkit_Shutdown();
+
+                return nativeInitialized;
+            }
         }
 
-#if UNITY_EDITOR_WIN
-        private static IntPtr FindNativeHostWindow()
+        private static void ReleaseNativeIfUnused()
         {
+            lock (NativeLifecycleLock)
+            {
+                if (!nativeInitialized || !Owners.IsEmpty)
+                    return;
+
+                WebViewNative.WebViewToolkit_Shutdown();
+                nativeInitialized = false;
+                renderEventFunction = IntPtr.Zero;
+                nextRenderUpdateAt = 0d;
+                nextHostWindowQuarantineAt = 0d;
+                while (NativeLogs.TryDequeue(out _)) { }
+            }
+        }
+
+        private static void QuarantineNativeHostWindows()
+        {
+#if UNITY_EDITOR_WIN
             var currentProcessId = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
             var candidate = IntPtr.Zero;
 
@@ -340,13 +331,26 @@ namespace MF.WebBrowser.Editor
                        NativeHostWindowTitle)) != IntPtr.Zero)
             {
                 GetWindowThreadProcessId(candidate, out var ownerProcessId);
-                if (ownerProcessId == currentProcessId)
-                    return candidate;
-            }
+                if (ownerProcessId != currentProcessId)
+                    continue;
 
-            return IntPtr.Zero;
+                // WebViewToolkit captures real top-level HWNDs. They must remain
+                // visible for capture, so park every host off-screen and let UI
+                // Toolkit forward input to the corresponding native handle.
+                EnableWindow(candidate, false);
+                SetWindowPos(
+                    candidate,
+                    IntPtr.Zero,
+                    NativeHostOffscreenPosition,
+                    NativeHostOffscreenPosition,
+                    0,
+                    0,
+                    SwpNoSize | SwpNoZOrder | SwpNoActivate);
+            }
+#endif
         }
 
+#if UNITY_EDITOR_WIN
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern IntPtr FindWindowEx(
             IntPtr parent,
@@ -358,10 +362,6 @@ namespace MF.WebBrowser.Editor
         private static extern uint GetWindowThreadProcessId(
             IntPtr window,
             out uint processId);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool IsWindow(IntPtr window);
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -539,14 +539,13 @@ namespace MF.WebBrowser.Editor
         [AOT.MonoPInvokeCallback(typeof(LogCallback))]
         private static void OnNativeLog(int level, string message)
         {
-            activeOwner?.nativeLogs.Enqueue(new NativeLog(level, message));
+            NativeLogs.Enqueue(new NativeLog(level, message));
         }
 
         [AOT.MonoPInvokeCallback(typeof(NavigationCallback))]
         private static void OnNativeNavigation(uint webViewHandle, string url, bool succeeded)
         {
-            var owner = activeOwner;
-            if (owner != null && owner.handle == webViewHandle)
+            if (Owners.TryGetValue(webViewHandle, out var owner))
                 owner.navigationResults.Enqueue(new NavigationResult(url, succeeded));
         }
 
@@ -558,8 +557,11 @@ namespace MF.WebBrowser.Editor
         [AOT.MonoPInvokeCallback(typeof(DeviceEventCallback))]
         private static void OnNativeDeviceEvent(DeviceEventType eventType)
         {
-            if (eventType == DeviceEventType.DeviceRestored && activeOwner != null)
-                activeOwner.refreshTexture = true;
+            if (eventType != DeviceEventType.DeviceRestored)
+                return;
+
+            foreach (var owner in Owners.Values)
+                owner.refreshTexture = true;
         }
 
         private readonly struct NavigationResult

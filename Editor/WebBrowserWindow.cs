@@ -45,7 +45,12 @@ namespace MF.WebBrowser.Editor
         [MenuItem("Window/MF/Web Browser")]
         private static void Open()
         {
-            GetWindow<WebBrowserWindow>();
+            var window = CreateWindow<WebBrowserWindow>(
+                "Web Browser",
+                typeof(WebBrowserWindow),
+                typeof(SceneView));
+            window.Show();
+            window.Focus();
         }
 
         private void OnEnable()
@@ -83,6 +88,7 @@ namespace MF.WebBrowser.Editor
             navigation.Add(CreateButton("←", "Back", () => browser?.GoBack()));
             navigation.Add(CreateButton("→", "Forward", () => browser?.GoForward()));
             navigation.Add(CreateButton("↻", "Refresh", () => browser?.Refresh()));
+            navigation.Add(CreateButton("+", "New browser tab", Open));
             toolbar.Add(navigation);
 
             var omnibox = new VisualElement

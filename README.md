@@ -38,11 +38,11 @@ bar entries remain visible for one-click navigation; entries moved to `Other
 Bookmarks` are available from the folder menu at the right of the bar. Choose
 `새 폴더 만들기…` in the bookmark editor to create a named folder. Named folders are
 shown directly on the bookmark bar and open their bookmark list when clicked.
-Right-click a bookmark to edit it, copy its URL, or remove it. Only one native
-WebView is kept active at a time, and it is suspended while entering Play Mode.
+Right-click a bookmark to edit it, copy its URL, or remove it. Use the `+` toolbar
+button or open `Window > MF > Web Browser` again to create another independent
+browser tab. Open WebViews are suspended while entering Play Mode.
 
 ## Current limitations
 
 - Windows only
 - Fixed 1280x720 backing texture
-- One active editor WebView at a time

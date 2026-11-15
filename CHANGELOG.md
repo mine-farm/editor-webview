@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0] - 2026-11-15
+
+- Added independent multi-tab Editor WebViews.
+- Added a new-tab toolbar button and made the Window menu open a new tab.
+- Shared the native WebView lifecycle safely across all open browser tabs.
+
 ## [0.8.0] - 2026-11-15
 
 - Kept the native WebView alive while switching between docked Editor tabs.
