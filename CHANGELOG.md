@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.3] - 2026-11-18
+
+- Added Unity metadata for the package manifest and root documentation files.
+
 ## [0.9.2] - 2026-11-15
 
 - Increased the fixed 16:9 backing texture to 1920x1080.
