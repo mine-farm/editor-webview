@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0] - 2026-11-23
+
+- Split bookmarks into shared project and local personal bars.
+- Store project bookmarks under `ProjectSettings/` and personal bookmarks under `UserSettings/`.
+- Add a bookmark destination selector and allow moving a bookmark between bars.
+- Preserve previous EditorPrefs bookmarks with one-time migration to personal storage.
+
 ## [0.9.3] - 2026-11-18
 
 - Added Unity metadata for the package manifest and root documentation files.

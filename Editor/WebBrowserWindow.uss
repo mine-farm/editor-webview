@@ -142,12 +142,17 @@
     border-bottom-color: #3c4043;
 }
 
+.web-browser-bookmark-bar--personal {
+    background-color: #242528;
+}
+
 .web-browser-bookmark-icon {
-    width: 28px;
+    width: 96px;
     flex-shrink: 0;
     color: #9aa0a6;
-    font-size: 15px;
-    -unity-text-align: middle-center;
+    font-size: 11px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-left;
 }
 
 .web-browser-bookmark-items {
